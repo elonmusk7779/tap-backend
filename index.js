@@ -18,25 +18,37 @@ const contract = new ethers.Contract(
 
 let taps = {};
 
+// receive taps from frontend
 app.post("/tap", (req, res) => {
-  const { user } = req.body;
+  const { user, count } = req.body;
 
   if (!user) return res.status(400).send("no user");
 
-  taps[user] = (taps[user] || 0) + 1;
+  // default = 1, but frontend will send 10
+  const tapCount = Number(count || 1);
+
+  taps[user] = (taps[user] || 0) + tapCount;
 
   res.send("ok");
 });
 
+// send to blockchain every 5 sec
 setInterval(async () => {
   for (let user in taps) {
-    if (taps[user] > 0) {
+    const count = taps[user];
+
+    if (count >= 10) {
       try {
-        await contract.recordTap(user, taps[user]);
-        console.log("sent", taps[user], "taps");
-        taps[user] = 0;
+        // send only multiples of 10
+        const sendCount = Math.floor(count / 10) * 10;
+
+        await contract.recordTap(user, sendCount);
+
+        console.log(`sent ${sendCount} taps for ${user}`);
+
+        taps[user] -= sendCount; // keep leftover taps
       } catch (e) {
-        console.log("error", e.message);
+        console.log("error:", e.message);
       }
     }
   }
